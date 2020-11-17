@@ -14,7 +14,7 @@ function addError(message, response) {
 }
 
 app.put('/expectation', function (request, response) {
-    const { path, method, body, response: expectedResponse } = request.body;
+    const { path, method, body, response: expectedResponse, optionalFields } = request.body;
     if (!path || !method || !body || !expectedResponse) {
         response.status(400).json({ message: 'Missing required fields' }).send();
 
@@ -25,7 +25,8 @@ app.put('/expectation', function (request, response) {
         path,
         method,
         body,
-        response: expectedResponse
+        response: expectedResponse,
+        optionalFields
     });
 
     response.send();
@@ -50,6 +51,21 @@ app.all('/space*', function (request, response) {
     const expectation = expectations.shift();
     if (!expectation) {
         return addError(`There were no expectations for request ${requestPath}`, response);
+    }
+
+    if (Array.isArray(expectation.optionalFields)) {
+        expectation.optionalFields.forEach((accessor) => {
+            if (!accessor.startsWith('[') && !accessor.startsWith('.')) {
+                accessor = `.${accessor}`;
+            }
+
+            try {
+                eval(`body${accessor} = "*"`);
+                eval(`expectation.body${accessor} = "*"`);
+            } catch (e) {
+                console.log(e);
+            }
+        })
     }
 
     if (method !== expectation.method) {
