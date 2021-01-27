@@ -2,7 +2,7 @@ const express = require("express");
 const equal = require('deep-equal');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '100mb' }));
 
 let expectations = [];
 let errors = [];
