@@ -33,7 +33,13 @@ app.put('/expectation', function (request, response) {
 });
 
 app.get('/errors', function (request, response) {
-    response.json({ errors }).send();
+    const targetErrors = [...errors];
+
+    if (expectations.length > 0) {
+        targetErrors.push(`Expectation list is not empty: ${expectations.map((e) => e.path)}`);
+    }
+
+    response.json({ errors: targetErrors }).send();
 });
 
 app.delete('/flush', function (request, response) {
