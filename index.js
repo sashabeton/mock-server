@@ -56,7 +56,7 @@ app.all('/space*', function (request, response) {
 
     const expectation = expectations.shift();
     if (!expectation) {
-        return addError(`There were no expectations for request ${requestPath}`, response);
+        return addError(`There were no expectations for request ${requestPath} with ${JSON.stringify(body)}`, response);
     }
 
     if (Array.isArray(expectation.optionalFields)) {
