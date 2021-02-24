@@ -35,7 +35,7 @@ app.put('/expectation', function (request, response) {
 app.get('/errors', function (request, response) {
     const targetErrors = [...errors];
 
-    if (expectations.length > 0) {
+    if (expectations.length > 0 && targetErrors.length === 0) {
         targetErrors.push(`Expectation list is not empty: ${expectations.map((e) => `${e.path} with ${JSON.stringify(e.body)}`)}`);
     }
 
