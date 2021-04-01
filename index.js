@@ -1,8 +1,11 @@
 const express = require("express");
 const equal = require('deep-equal');
 
-const app = express();
-app.use(express.json({ limit: '100mb' }));
+const configurator = express();
+configurator.use(express.json({ limit: '100mb' }));
+
+const matcher = express();
+matcher.use(express.json({ limit: '100mb' }));
 
 let expectations = [];
 let errors = [];
@@ -13,7 +16,7 @@ function addError(message, response) {
     response.status(501).json({ message }).send();
 }
 
-app.put('/expectation', function (request, response) {
+configurator.put('/expectation', function (request, response) {
     const { path, method, body, response: expectedResponse, optionalFields } = request.body;
     if (!path || !method || !body || !expectedResponse) {
         response.status(400).json({ message: 'Missing required fields' }).send();
@@ -32,31 +35,34 @@ app.put('/expectation', function (request, response) {
     response.send();
 });
 
-app.get('/errors', function (request, response) {
+configurator.get('/errors', function (request, response) {
     const targetErrors = [...errors];
 
     if (expectations.length > 0 && targetErrors.length === 0) {
-        targetErrors.push(`Expectation list is not empty: ${expectations.map((e) => `${e.path} with ${JSON.stringify(e.body)}`)}`);
+        targetErrors.push(`Expectation list is not empty: ${expectations.map((e) => `${e.path} with ${JSON.stringify(e.body, undefined, 2)}`)}`);
     }
 
     response.json({ errors: targetErrors }).send();
 });
 
-app.delete('/flush', function (request, response) {
+configurator.delete('/flush', function (request, response) {
     errors = [];
     expectations = [];
 
     response.status(205).send();
 });
 
-app.all('/space*', function (request, response) {
-    const requestPath = request.originalUrl.replace(/^\/space\/?/, '/');
+matcher.all('/*', function (request, response) {
+    const requestPath = request.originalUrl === '/'
+        ? '/'
+        : request.originalUrl.replace(/\/$/, '');
+
     const method = request.method;
     const body = request.body;
 
     const expectation = expectations.shift();
     if (!expectation) {
-        return addError(`There were no expectations for request ${requestPath} with ${JSON.stringify(body)}`, response);
+        return addError(`There were no expectations for request ${requestPath} with ${JSON.stringify(body, undefined, 2)}`, response);
     }
 
     if (Array.isArray(expectation.optionalFields)) {
@@ -83,7 +89,7 @@ app.all('/space*', function (request, response) {
     }
 
     if (requestPath !== expectation.path) {
-        return addError(`Expected path ${expectation.path} does not match actual ${requestPath} ${JSON.stringify(body)}`, response);
+        return addError(`Expected path ${expectation.path} does not match actual ${requestPath} ${JSON.stringify(body, undefined, 2)}`, response);
     }
 
     if (!equal(body, expectation.body)
@@ -93,7 +99,7 @@ app.all('/space*', function (request, response) {
         )
     ) {
         return addError(
-            `Expected request body ${JSON.stringify(expectation.body)} does not match actual ${JSON.stringify(body)}`,
+            `Expected request body ${JSON.stringify(expectation.body, undefined, 2)} does not match actual ${JSON.stringify(body, undefined, 2)}`,
             response
         );
     }
@@ -105,4 +111,6 @@ app.all('/space*', function (request, response) {
     ;
 });
 
-app.listen(process.env.PORT || 80);
+configurator.listen(process.env.CONFIGURATOR_PORT || 81, () => {
+    matcher.listen(process.env.MATCHER_PORT || 80);
+});
