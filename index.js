@@ -1,11 +1,17 @@
 const express = require("express");
 const equal = require('deep-equal');
+const concat = require('concat-stream');
 
 const configurator = express();
 configurator.use(express.json({ limit: '100mb' }));
 
 const matcher = express();
-matcher.use(express.json({ limit: '100mb' }));
+matcher.use(express.json({ limit: '100mb' })).use(function(req, res, next){
+    req.pipe(concat(function(data){
+        req.rawBody = data.toString();
+        next();
+    }));
+});
 
 let expectations = [];
 let errors = [];
@@ -17,7 +23,7 @@ function addError(message, response) {
 }
 
 configurator.put('/expectation', function (request, response) {
-    const { path, method, body, response: expectedResponse, optionalFields } = request.body;
+    const { path, method, body, response: expectedResponse, optionalFields, raw } = request.body;
     if (!path || !method || !body || !expectedResponse) {
         response.status(400).json({ message: 'Missing required fields' }).send();
 
@@ -29,7 +35,8 @@ configurator.put('/expectation', function (request, response) {
         method,
         body,
         response: expectedResponse,
-        optionalFields
+        optionalFields,
+        raw
     });
 
     response.send();
@@ -63,6 +70,19 @@ matcher.all('/*', function (request, response) {
     const expectation = expectations.shift();
     if (!expectation) {
         return addError(`There were no expectations for request ${requestPath} with ${JSON.stringify(body, undefined, 2)}`, response);
+    }
+
+    if (expectation.raw) {
+        if (expectation.body !== request.rawBody) {
+            return addError(`Expected raw body ${expectation.body} does not match actual ${request.rawBody}`, response);
+        }
+
+        response
+            .status(expectation.response.code || 200)
+            .json(expectation.response.body || {})
+            .send();
+
+        return;
     }
 
     if (Array.isArray(expectation.optionalFields)) {
