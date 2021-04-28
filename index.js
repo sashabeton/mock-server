@@ -6,8 +6,8 @@ const configurator = express();
 configurator.use(express.json({ limit: '100mb' }));
 
 const matcher = express();
-matcher.use(express.json({ limit: '100mb' })).use(function(req, res, next){
-    req.pipe(concat(function(data){
+matcher.use(express.json({ limit: '100mb', strict: false })).use(function(req, res, next) {
+    req.pipe(concat(function(data) {
         req.rawBody = data.toString();
         next();
     }));
@@ -73,8 +73,9 @@ matcher.all('/*', function (request, response) {
     }
 
     if (expectation.raw) {
-        if (expectation.body !== request.rawBody) {
-            return addError(`Expected raw body ${expectation.body} does not match actual ${request.rawBody}`, response);
+        let requestBody = request.rawBody || request.body;
+        if (expectation.body !== requestBody) {
+            return addError(`Expected raw body ${expectation.body} does not match actual ${requestBody}`, response);
         }
 
         response
