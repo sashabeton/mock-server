@@ -2,35 +2,67 @@ const express = require("express");
 const equal = require('deep-equal');
 const concat = require('concat-stream');
 
-const configurator = express();
-configurator.use(express.json({ limit: '100mb' }));
-
-const matcher = express();
-matcher.use(express.json({ limit: '100mb', strict: false })).use(function(req, res, next) {
+const app = express();
+app.use(express.json({ limit: '100mb', strict: false })).use(function(req, res, next) {
     req.pipe(concat(function(data) {
         req.rawBody = data.toString();
         next();
     }));
 });
 
-let expectations = [];
-let errors = [];
+let expectationsBySession = {};
+let errorsBySession = {};
 
-function addError(message, response) {
-    errors.push(message);
+function addError(sessionId, message, response) {
+    if (!errorsBySession.hasOwnProperty(sessionId)) {
+        errorsBySession[sessionId] = [];
+    }
+
+    errorsBySession[sessionId].push(message);
 
     response.status(501).json({ message }).send();
 }
 
-configurator.put('/expectation', function (request, response) {
-    const { path, method, body, response: expectedResponse, optionalFields, raw } = request.body;
-    if (!path || !method || !body || !expectedResponse) {
-        response.status(400).json({ message: 'Missing required fields' }).send();
-
+app.post('/session', function (request, response) {
+    const { id, previousId } = request.body;
+    if (!id) {
+        response.status(400).json({ message: 'Missing session id' });
         return;
     }
 
-    expectations.push({
+    if (!id.match(/^[a-z0-9]{64}$/)) {
+        response.status(400).json({ message: 'Invalid session id (should be 64 hex chars)'})
+        return;
+    }
+
+    if (previousId) {
+        delete expectationsBySession[previousId];
+        delete errorsBySession[previousId];
+    }
+
+    expectationsBySession[id] = [];
+    response.status(200).json({});
+});
+
+app.put('/expectation', function (request, response) {
+    const { sessionId } = request.body;
+    if (!sessionId) {
+        response.status(400).json({ message: 'Session id must be set' });
+        return;
+    }
+
+    if (!expectationsBySession.hasOwnProperty(sessionId)) {
+        response.status(400).json({ message: 'Undefined session' });
+        return;
+    }
+
+    const { path, method, body, response: expectedResponse, optionalFields, raw } = request.body;
+    if (!path || !method || !body || !expectedResponse) {
+        response.status(400).json({ message: 'Missing required fields' }).send();
+        return;
+    }
+
+    expectationsBySession[sessionId].push({
         path,
         method,
         body,
@@ -42,40 +74,55 @@ configurator.put('/expectation', function (request, response) {
     response.send();
 });
 
-configurator.get('/errors', function (request, response) {
-    const targetErrors = [...errors];
+app.get('/errors', function (request, response) {
+    const sessionId = request.query.sessionId;
+    if (!sessionId) {
+        response.status(400).json({ message: 'Missing session id in request' });
+        return;
+    }
 
-    if (expectations.length > 0 && targetErrors.length === 0) {
-        targetErrors.push(`Expectation list is not empty: ${expectations.map((e) => `${e.path} with ${JSON.stringify(e.body, undefined, 2)}`)}`);
+    const targetErrors = [...(errorsBySession[sessionId] || [])];
+    const sessionExpectations = expectationsBySession[sessionId] || [];
+
+    if (sessionExpectations.length > 0 && targetErrors.length === 0) {
+        targetErrors.push(`Expectation list is not empty: ${sessionExpectations.map((e) => `${e.path} with ${JSON.stringify(e.body, undefined, 2)}`)}`);
     }
 
     response.json({ errors: targetErrors }).send();
 });
 
-configurator.delete('/flush', function (request, response) {
-    errors = [];
-    expectations = [];
+app.delete('/flush', function (request, response) {
+    errorsBySession = {};
+    expectationsBySession = {};
 
     response.status(205).send();
 });
 
-matcher.all('/*', function (request, response) {
-    const requestPath = request.originalUrl === '/'
+app.all(/^\/[a-z0-9]{64}(\/*)?/, function (request, response) {
+    const sessionId = request.originalUrl.substring(1, 65);
+    if (!expectationsBySession.hasOwnProperty(sessionId)) {
+        addError(sessionId, 'Session is not created', response);
+        return;
+    }
+
+    const originalUrl = request.originalUrl.substr(65);
+
+    const requestPath = ((originalUrl === '') || (originalUrl === '/'))
         ? '/'
-        : request.originalUrl.replace(/\/$/, '');
+        : originalUrl.replace(/\/$/, '');
 
     const method = request.method;
     const body = request.body;
 
-    const expectation = expectations.shift();
+    const expectation = expectationsBySession[sessionId].shift();
     if (!expectation) {
-        return addError(`There were no expectations for request ${requestPath} with ${JSON.stringify(body, undefined, 2)}`, response);
+        return addError(sessionId, `There were no expectations for request ${requestPath} with ${JSON.stringify(body, undefined, 2)}`, response);
     }
 
     if (expectation.raw) {
         let requestBody = request.rawBody || request.body;
         if (expectation.body !== requestBody) {
-            return addError(`Expected raw body ${expectation.body} does not match actual ${requestBody}`, response);
+            return addError(sessionId, `Expected raw body ${expectation.body} does not match actual ${requestBody}`, response);
         }
 
         response
@@ -102,7 +149,7 @@ matcher.all('/*', function (request, response) {
     }
 
     if (method !== expectation.method) {
-        return addError(`Expected method ${expectation.method} does not match actual ${method}`, response);
+        return addError(sessionId, `Expected method ${expectation.method} does not match actual ${method}`, response);
     }
 
     if (!expectation.path.startsWith('/')) {
@@ -110,7 +157,7 @@ matcher.all('/*', function (request, response) {
     }
 
     if (requestPath !== expectation.path) {
-        return addError(`Expected path ${expectation.path} does not match actual ${requestPath} ${JSON.stringify(body, undefined, 2)}`, response);
+        return addError(sessionId, `Expected path ${expectation.path} does not match actual ${requestPath} ${JSON.stringify(body, undefined, 2)}`, response);
     }
 
     if (!equal(body, expectation.body)
@@ -120,6 +167,7 @@ matcher.all('/*', function (request, response) {
         )
     ) {
         return addError(
+            sessionId,
             `Expected request body ${JSON.stringify(expectation.body, undefined, 2)} does not match actual ${JSON.stringify(body, undefined, 2)}`,
             response
         );
@@ -132,6 +180,4 @@ matcher.all('/*', function (request, response) {
     ;
 });
 
-configurator.listen(process.env.CONFIGURATOR_PORT || 81, () => {
-    matcher.listen(process.env.MATCHER_PORT || 80);
-});
+app.listen(process.env.PORT || 80);
