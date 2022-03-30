@@ -127,7 +127,7 @@ app.all(/^\/[a-z0-9]{64}(\/*)?/, function (request, response) {
 
         response
             .status(expectation.response.code || 200)
-            .json(expectation.response.body || {})
+            .json(expectation.response.body)
             .send();
 
         return;
@@ -175,7 +175,7 @@ app.all(/^\/[a-z0-9]{64}(\/*)?/, function (request, response) {
 
     response
         .status(expectation.response.code || 200)
-        .json(expectation.response.body || {})
+        .json(expectation.response.body)
         .send()
     ;
 });
