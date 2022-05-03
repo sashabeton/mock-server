@@ -11,13 +11,13 @@ You can clone this repository and start mock server with next setup:
 
 ```bash
 npm i
-node index.js
+node src/index.js
 ```
 
 This will run mock server on 80 port. To change port you can set environment variable PORT:
 
 ```bash
-PORT=81 node index.js
+PORT=81 node src/index.js
 ```
 
 ### Running in Docker

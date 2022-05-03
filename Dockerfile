@@ -1,10 +1,8 @@
 FROM node:12-alpine
 
-COPY index.js .
+COPY src src
 COPY package.json .
 
 RUN npm i --no-dev
 
-EXPOSE 80
-
-CMD ["node", "index.js"]
+CMD ["node", "src/index.js"]
