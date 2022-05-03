@@ -71,7 +71,7 @@ app.put('/expectation', function (request, response) {
         raw
     });
 
-    response.send();
+    response.json({});
 });
 
 app.get('/errors', function (request, response) {
@@ -119,20 +119,6 @@ app.all(/^\/[a-z0-9]{64}(\/*)?/, function (request, response) {
         return addError(sessionId, `There were no expectations for request ${requestPath} with ${JSON.stringify(body, undefined, 2)}`, response);
     }
 
-    if (expectation.raw) {
-        let requestBody = request.rawBody || request.body;
-        if (expectation.body !== requestBody) {
-            return addError(sessionId, `Expected raw body ${expectation.body} does not match actual ${requestBody}`, response);
-        }
-
-        response
-            .status(expectation.response.code || 200)
-            .json(expectation.response.body)
-            .send();
-
-        return;
-    }
-
     if (Array.isArray(expectation.optionalFields)) {
         expectation.optionalFields.forEach((accessor) => {
             if (!accessor.startsWith('[') && !accessor.startsWith('.')) {
@@ -160,6 +146,20 @@ app.all(/^\/[a-z0-9]{64}(\/*)?/, function (request, response) {
         return addError(sessionId, `Expected path ${expectation.path} does not match actual ${requestPath} ${JSON.stringify(body, undefined, 2)}`, response);
     }
 
+    if (expectation.raw) {
+        let requestBody = request.rawBody || request.body;
+        if (expectation.body !== requestBody) {
+            return addError(sessionId, `Expected raw body ${expectation.body} does not match actual ${requestBody}`, response);
+        }
+
+        response
+            .status(expectation.response.code || 200)
+            .json(expectation.response.body)
+            .send();
+
+        return;
+    }
+
     if (!equal(body, expectation.body)
         && !(
             ['[]', '{}'].includes(JSON.stringify(body))
@@ -176,8 +176,7 @@ app.all(/^\/[a-z0-9]{64}(\/*)?/, function (request, response) {
     response
         .status(expectation.response.code || 200)
         .json(expectation.response.body)
-        .send()
-    ;
+        .send();
 });
 
-app.listen(process.env.PORT || 80);
+module.exports = app;
