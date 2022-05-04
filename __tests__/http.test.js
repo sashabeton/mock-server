@@ -57,7 +57,7 @@ describe("Session creation", () => {
         assertResponseEquals(newSessionResponse, 200, {});
 
         const errorsResponseAfter = await request(axios.get(`${baseUrl}/errors`, { params: { sessionId: session1Id }}));
-        assertResponseEquals(errorsResponseAfter, 200, { errors: [] });
+        assertResponseEquals(errorsResponseAfter, 400, { message: "Session with such id does not exist" });
     });
 });
 
@@ -81,7 +81,7 @@ describe('Expectation creation', function () {
 
     test("Session existence validation", async () => {
         const response = await request(axios.put(`${baseUrl}/expectation`, { sessionId: 'a'.repeat(64) }));
-        assertResponseEquals(response, 400, { message: 'Undefined session' });
+        assertResponseEquals(response, 400, { message: 'Session with such id does not exist' });
     });
 
     test("Required fields validation", async () => {
@@ -135,10 +135,10 @@ describe("Flushing state", () => {
         });
 
         const flushResponse = await request(axios.delete(`${baseUrl}/flush`));
-        assertResponseEquals(flushResponse, 205, "");
+        assertResponseEquals(flushResponse, 205, {});
 
         const errorsResponseAfter = await request(axios.get(`${baseUrl}/errors`, { params: { sessionId }}));
-        assertResponseEquals(errorsResponseAfter, 200, { errors: [] });
+        assertResponseEquals(errorsResponseAfter, 400, { message: "Session with such id does not exist" });
     });
 });
 
@@ -151,7 +151,7 @@ describe("Matching", () => {
 
     test("Nonexistent session", async () => {
         const response = await request(axios.get(`${baseUrl}/${'a'.repeat(64)}/`));
-        assertResponseEquals(response, 501, { message: "Session is not created" });
+        assertResponseEquals(response, 501, { message: "Session with such id does not exist" });
     });
 
     test("No expectations for request", async () => {
