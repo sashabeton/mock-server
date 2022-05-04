@@ -43,7 +43,6 @@ module.exports = class Expectation {
                     eval(`body${accessor} = "*"`);
                     eval(`this.body${accessor} = "*"`);
                 } catch (e) {
-                    console.log(e);
                 }
             })
         }

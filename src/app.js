@@ -4,7 +4,9 @@ const concat = require('concat-stream');
 const State = require("./State");
 const Endpoints = require("./Endpoints");
 
-const state = new State();
+// Initialization
+State.instance;
+
 const app = Express();
 
 app.use(Express.json({ limit: '100mb', strict: false }));
@@ -15,14 +17,13 @@ app.use(function(req, res, next) {
     }));
 });
 
-app.post('/session', Endpoints.createSession(state));
-app.get('/errors', Endpoints.getErrors(state));
-app.delete('/flush', Endpoints.flush(state));
+app.post('/session', Endpoints.createSession);
+app.get('/errors', Endpoints.getErrors);
+app.delete('/flush', Endpoints.flush);
 
-app.put('/expectation', Endpoints.addHttpExpectation(state));
-app.all(/^\/[a-z0-9]{64}(\/*)?/, Endpoints.matchHttpRequest(state));
-
-// todo: grpc expectation
-// Todo: grpc matching
+app.post("/grpc/enable", Endpoints.enableGrpcForSession);
+app.put("/expectation/grpc", Endpoints.addExpectation("grpc"));
+app.put('/expectation', Endpoints.addExpectation("http"));
+app.all(/^\/[a-z0-9]{64}(\/*)?/, Endpoints.matchHttpRequest);
 
 module.exports = app;
