@@ -37,7 +37,7 @@ module.exports = async (request, response) => {
         session.grpcServer = new Grpc.Server(instance, port);
 
         const creationPromise = new Promise((resolve, reject) => {
-            instance.bindAsync("127.0.0.1:" + port, ServerCredentials.createInsecure(), () => {
+            instance.bindAsync("0.0.0.0:" + port, ServerCredentials.createInsecure(), () => {
                 try {
                     instance.start();
                     resolve();
