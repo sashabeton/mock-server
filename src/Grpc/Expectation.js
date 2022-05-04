@@ -30,11 +30,11 @@ module.exports = class Expectation {
 
     match(path, request) {
         if (path !== this.path) {
-            throw new Mismatch(`Expected path ${this.path} does not match actual ${path}`);
+            throw new Mismatch(`Expected path "${this.path}" does not match actual "${path}"`);
         }
 
         if (request !== this.request) {
-            throw new Mismatch(`Expected request ${this.request} does not match actual ${request} at path ${path}`);
+            throw new Mismatch(`Expected request "${this.request}" does not match actual "${request}" at path "${path}"`);
         }
 
         return Buffer.from(this.response, 'hex');
