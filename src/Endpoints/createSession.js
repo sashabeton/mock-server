@@ -1,4 +1,6 @@
-module.exports = (state) => (request, response) => {
+const State = require("../State");
+
+module.exports = (request, response) => {
     const { id, previousId } = request.body;
     if (!id) {
         response.status(400).json({ message: 'Missing session id' });
@@ -11,10 +13,10 @@ module.exports = (state) => (request, response) => {
     }
 
     if (previousId) {
-        state.deleteSession(previousId);
+        State.instance.deleteSession(previousId);
     }
 
-    state.createSession(id);
+    State.instance.createSession(id);
 
     response.status(200).json({});
 };

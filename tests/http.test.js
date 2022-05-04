@@ -1,25 +1,16 @@
 const axios = require('axios');
 const app = require('../src/app');
+const utils = require("./utils");
+
 const port = 8000;
 const baseUrl = `http://localhost:${port}`;
+const { request, assertResponseEquals } = utils;
+const createSession = (id) => utils.createSession(baseUrl, id);
 
 let server;
 
 beforeEach(() => server = app.listen(port));
 afterEach(() => server.close());
-
-const request = async (axiosPromise) => {
-    try {
-        return await axiosPromise;
-    } catch (error) {
-        return error.response;
-    }
-}
-
-const assertResponseEquals = (response, expectedStatus, expectedResponse) => {
-    expect(response.status).toEqual(expectedStatus);
-    expect(response.data).toEqual(expectedResponse);
-};
 
 describe("Session creation", () => {
     test('Session id requirement', async () => {
@@ -67,11 +58,6 @@ describe("Requesting errors", () => {
         assertResponseEquals(response, 400, { message: "Missing session id in request" });
     });
 });
-
-const createSession = async (id) => {
-    const response = await request(axios.post(`${baseUrl}/session`, { id }));
-    assertResponseEquals(response, 200, {});
-};
 
 describe('Expectation creation', function () {
     test("Session id requirement", async () => {

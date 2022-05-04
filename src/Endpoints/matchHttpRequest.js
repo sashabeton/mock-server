@@ -1,8 +1,10 @@
+const State = require("../State");
 const Mismatch = require("../Mismatch");
+const Expectation = require("../Http/Expectation");
 
-module.exports = (state) => (request, response) => {
+module.exports = (request, response) => {
     const sessionId = request.originalUrl.substring(1, 65);
-    const session = state.getById(sessionId);
+    const session = State.instance.getSessionById(sessionId);
     if (!session) {
         response.status(501).json({ message: "Session with such id does not exist" });
         return;
@@ -10,7 +12,7 @@ module.exports = (state) => (request, response) => {
 
     // Getting next expectation from queue
     const expectation = session.httpExpectations.shift();
-    if (!expectation) {
+    if (!(expectation instanceof Expectation)) {
         const path = request.originalUrl.substr(65).replace(/\/$/, '') || '/';
         const actualBodyString = JSON.stringify(request.body, undefined, 2);
         const message = `There were no expectations for request ${path} with ${actualBodyString}`;
