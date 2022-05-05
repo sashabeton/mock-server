@@ -5,6 +5,8 @@ module.exports = class State {
 
     /** @type {Object.<string,Session>} */
     sessions;
+    /** @type {Array.<Server>} */
+    grpcServers;
 
     /** @returns {State} */
     static get instance() {
@@ -17,6 +19,7 @@ module.exports = class State {
 
     constructor() {
         this.sessions = {};
+        this.grpcServers = [];
     }
 
     /** @return {Session|undefined} */
@@ -25,16 +28,8 @@ module.exports = class State {
     createSession = (id) => this.sessions[id] = new Session(id);
 
     deleteSession = (id) => {
-        if (!this.sessions[id]) {
-            return;
-        }
-
-        if (this.sessions[id].grpcServer) {
-            this.sessions[id].grpcServer.instance.forceShutdown();
-        }
-
         delete this.sessions[id];
     }
 
-    flush = () => Object.keys(this.sessions).forEach(this.deleteSession);
+    flush = () => this.sessions = {};
 }

@@ -7,8 +7,8 @@ module.exports = class Session {
     httpExpectations;
     /** @type {Array.<Expectation>} */
     grpcExpectations;
-    /** @type {Server|undefined} */
-    grpcServer;
+    /** @type number */
+    grpcPort;
 
     constructor(id) {
         this.id = id;

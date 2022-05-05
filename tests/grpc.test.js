@@ -16,8 +16,10 @@ let server;
 beforeEach(() => server = app.listen(port));
 afterEach(() => {
     server.close();
-    Object.values(State.instance.sessions)
-        .forEach((session) => session.grpcServer && session.grpcServer.instance.forceShutdown());
+    State.instance.grpcServers
+        .forEach((server) => server.instance.forceShutdown());
+    State.instance.grpcServers = [];
+    State.instance.sessions = {};
 });
 
 describe("Validation during enabling gRPC", () => {
@@ -41,31 +43,32 @@ describe("Validation during enabling gRPC", () => {
         assertResponseEquals(response1, 200, { port: 50051 });
 
         expect(State.instance.sessions[session1Id]).toBeDefined();
-        expect(State.instance.sessions[session1Id].grpcServer).toBeDefined();
+        expect(State.instance.sessions[session1Id].grpcPort).toBeDefined();
 
         const response2 = await request(axios.post(`${baseUrl}/grpc/enable`, { sessionId: session2Id }));
         assertResponseEquals(response2, 200, { port: 50052 });
 
         expect(State.instance.sessions[session1Id]).toBeDefined();
-        expect(State.instance.sessions[session1Id].grpcServer).toBeDefined();
+        expect(State.instance.sessions[session1Id].grpcPort).toBeDefined();
         expect(State.instance.sessions[session2Id]).toBeDefined();
-        expect(State.instance.sessions[session2Id].grpcServer).toBeDefined();
+        expect(State.instance.sessions[session2Id].grpcPort).toBeDefined();
 
         const response2Duplicated = await request(axios.post(`${baseUrl}/grpc/enable`, { sessionId: session2Id }));
         assertResponseEquals(response2Duplicated, 200, { port: 50052 });
 
         const session3Id = 'c'.repeat(64);
-        await createSession(session3Id, session2Id);
+        await createSession(session3Id);
 
         expect(State.instance.sessions[session1Id]).toBeDefined();
-        expect(State.instance.sessions[session1Id].grpcServer).toBeDefined();
-        expect(State.instance.sessions[session2Id]).toBeUndefined();
+        expect(State.instance.sessions[session1Id].grpcPort).toBeDefined();
+        expect(State.instance.sessions[session2Id]).toBeDefined();
+        expect(State.instance.sessions[session2Id].grpcPort).toBeDefined();
         expect(State.instance.sessions[session3Id]).toBeDefined();
-        expect(State.instance.sessions[session3Id].grpcServer).toBeUndefined();
+        expect(State.instance.sessions[session3Id].grpcPort).toBeUndefined();
 
         const otherServer = createServer();
         const creationPromise = new Promise((resolve, reject) => {
-            otherServer.bindAsync("127.0.0.1:50052", grpc.ServerCredentials.createInsecure(), () => {
+            otherServer.bindAsync("0.0.0.0:50053", grpc.ServerCredentials.createInsecure(), () => {
                 try {
                     otherServer.start();
                     resolve();
@@ -161,7 +164,7 @@ describe("Matching gRPC requests", () => {
 
         const errorsResponse = await request(axios.get(`${baseUrl}/errors?sessionId=${sessionId}`));
         assertResponseEquals(errorsResponse, 200, {
-            errors: ["There were no expectations for gRPC request to /test with 1111"],
+            errors: ["There were no expectations for gRPC request to \"/test\" with \"1111\""],
         });
     });
 
@@ -185,7 +188,7 @@ describe("Matching gRPC requests", () => {
 
         const errorsResponse = await request(axios.get(`${baseUrl}/errors?sessionId=${sessionId}`));
         assertResponseEquals(errorsResponse, 200, {
-            errors: ["Expected path /test/other/path does not match actual /test"],
+            errors: ["Expected path \"/test/other/path\" does not match actual \"/test\""],
         });
     });
 
@@ -209,7 +212,7 @@ describe("Matching gRPC requests", () => {
 
         const errorsResponse = await request(axios.get(`${baseUrl}/errors?sessionId=${sessionId}`));
         assertResponseEquals(errorsResponse, 200, {
-            errors: ["Expected request 1122 does not match actual 1111 at path /test"],
+            errors: ["Expected request \"1122\" does not match actual \"1111\" at path \"/test\""],
         });
     });
 

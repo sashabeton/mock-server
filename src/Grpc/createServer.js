@@ -1,15 +1,14 @@
 const { Server } = require("@grpc/grpc-js");
 const Expectation = require("./Expectation");
 const Mismatch = require("../Mismatch");
+const State = require("../State");
 
 class WrappedMap extends Map {
-    /** @type {Session} */
-    session;
+    port;
 
-    /** @param {Session} session */
-    constructor(session) {
+    constructor(port) {
         super();
-        this.session = session;
+        this.port = port;
     }
 
     get(key) {
@@ -30,10 +29,15 @@ class WrappedMap extends Map {
     };
 
     match = (path, requestHex) => {
-        const expectation = this.session.grpcExpectations.shift();
+        const session = Object.values(State.instance.sessions).filter((session) => session.grpcPort === this.port)[0];
+        if (!session) {
+            return Buffer.alloc(0);
+        }
+
+        const expectation = session.grpcExpectations.shift();
         if (!(expectation instanceof Expectation)) {
-            this.session.errors.push(`There were no expectations for gRPC request to ${path} with ${requestHex}`);
-            return new Buffer([]);
+            session.errors.push(`There were no expectations for gRPC request to "${path}" with "${requestHex}"`);
+            return Buffer.alloc(0);
         }
 
         try {
@@ -43,8 +47,8 @@ class WrappedMap extends Map {
                 throw error;
             }
 
-            this.session.errors.push(error.message);
-            return new Buffer([]);
+            session.errors.push(error.message);
+            return Buffer.alloc(0);
         }
     }
 }

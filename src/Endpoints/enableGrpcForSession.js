@@ -7,8 +7,7 @@ const MAX_PORT = 65535;
 
 const findFreePort = () => {
     for (let port = MIN_PORT; port <= MAX_PORT; port++) {
-        let isUsed = Object.values(State.instance.sessions)
-            .some((session) => session.grpcServer && (session.grpcServer.port === port));
+        let isUsed = Object.values(State.instance.sessions).some((session) => session.grpcPort === port);
 
         if (!isUsed) {
             return port;
@@ -31,13 +30,20 @@ module.exports = async (request, response) => {
         return;
     }
 
-    if (!session.grpcServer) {
-        const port = findFreePort();
-        const instance = Grpc.createServer(session);
-        session.grpcServer = new Grpc.Server(instance, port);
+    if (!session.grpcPort) {
+        const freePort = findFreePort();
+        const instance = Grpc.createServer(freePort);
+        session.grpcPort = freePort;
 
         const creationPromise = new Promise((resolve, reject) => {
-            instance.bindAsync("0.0.0.0:" + port, ServerCredentials.createInsecure(), () => {
+            if (State.instance.grpcServers.some((server) => server.port === freePort)) {
+                resolve();
+                return;
+            }
+
+            State.instance.grpcServers.push(new Grpc.Server(instance, freePort));
+
+            instance.bindAsync(`0.0.0.0:${freePort}`, ServerCredentials.createInsecure(), () => {
                 try {
                     instance.start();
                     resolve();
@@ -55,5 +61,5 @@ module.exports = async (request, response) => {
         }
     }
 
-    response.status(200).json({ port: session.grpcServer.port });
+    response.status(200).json({ port: session.grpcPort });
 };
