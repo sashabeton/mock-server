@@ -12,7 +12,7 @@ const app = Express();
 app.use(Express.json({ limit: '100mb', strict: false }));
 app.use(function(req, res, next) {
     req.pipe(concat(function(data) {
-        req.rawBody = data.toString();
+        req.rawBody = data;
         next();
     }));
 });

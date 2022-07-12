@@ -78,6 +78,22 @@ describe('Expectation creation', function () {
         assertResponseEquals(response, 400, { message: 'Missing required fields' });
     });
 
+    test("Body type validation", async () => {
+        const sessionId = 'a'.repeat(64);
+
+        await createSession(sessionId);
+
+        const response = await request(axios.put(`${baseUrl}/expectation`, {
+            sessionId,
+            path: '/somePath',
+            method: 'POST',
+            body: { key: "value" },
+            response: { body: {}, code: 200 },
+            bodyType: "invalid"
+        }));
+        assertResponseEquals(response, 400, { message: 'Invalid body type' });
+    })
+
     test("Create expectation for the specified session", async () => {
         const session1Id = 'a'.repeat(64);
         const session2Id = 'b'.repeat(64);
@@ -179,7 +195,7 @@ describe("Matching", () => {
             method: "POST",
             body: "some body",
             response: {},
-            raw: true
+            bodyType: "plain"
         });
 
         const response = await request(axios.post(`${baseUrl}/${sessionId}/somepath`, "another body"));
@@ -195,12 +211,40 @@ describe("Matching", () => {
             method: "POST",
             body: "some body",
             response: {},
-            raw: true
+            bodyType: "plain"
         });
 
         const response = await request(axios.post(`${baseUrl}/${sessionId}/somepath`, "some body"));
         assertResponseEquals(response, 200, "");
     });
+
+    test("Binary body doesn't match expected", async () => {
+        await createSession(sessionId);
+        await createExpectation({
+            path: "/somepath",
+            method: "POST",
+            body: "aaaaaa",
+            response: {},
+            bodyType: "binary"
+        });
+
+        const response = await request(axios.post(`${baseUrl}/${sessionId}/somepath`, "aaaaaa"));
+        assertResponseEquals(response, 501, { message: "Expected raw body aaaaaa does not match actual 616161616161" });
+    });
+
+    test("Binary body matches expected", async () => {
+        await createSession(sessionId);
+        await createExpectation({
+            path: "/somepath",
+            method: "POST",
+            body: "aaaaaa",
+            response: {},
+            bodyType: "binary"
+        });
+
+        const response = await request(axios.post(`${baseUrl}/${sessionId}/somepath`, Buffer.from('aaaaaa', 'hex')));
+        assertResponseEquals(response, 200, "");
+    })
 
     test("JSON body does not match expected", async () => {
         await createSession(sessionId);

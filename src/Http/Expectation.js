@@ -1,30 +1,38 @@
 const Mismatch = require("../Mismatch");
 const equal = require("deep-equal");
 
+const BODY_TYPE_JSON = 'json';
+const BODY_TYPE_PLAIN = 'plain';
+const BODY_TYPE_BINARY = 'binary';
+
 module.exports = class Expectation {
     path;
     method;
     body;
     response;
     optionalFields;
-    raw;
+    bodyType;
 
     static fromRequest(request) {
-        const { path, method, body, response, optionalFields, raw } = request.body;
-        if (!path || !method || !body || !response) {
+        const { path, method, body, response, optionalFields, bodyType = BODY_TYPE_JSON } = request.body;
+        if (!path || !method || !body || !response || !bodyType) {
             throw new Error("Missing required fields");
         }
 
-        return new Expectation(path, method, body, response, optionalFields, raw);
+        if (![BODY_TYPE_JSON, BODY_TYPE_PLAIN, BODY_TYPE_BINARY].includes(bodyType)) {
+            throw new Error("Invalid body type");
+        }
+
+        return new Expectation(path, method, body, response, optionalFields, bodyType);
     }
 
-    constructor(path, method, body, response, optionalFields, raw) {
+    constructor(path, method, body, response, optionalFields, bodyType) {
         this.path = path;
         this.method = method;
         this.body = body;
         this.response = response;
         this.optionalFields = optionalFields;
-        this.raw = raw;
+        this.bodyType = bodyType;
     }
 
     match = (request) => {
@@ -60,8 +68,11 @@ module.exports = class Expectation {
             throw new Mismatch(`Expected path ${this.path} does not match actual ${requestPath} ${actualBodyString}`);
         }
 
-        if (this.raw) {
-            let requestBody = request.rawBody || request.body;
+        if (this.bodyType !== BODY_TYPE_JSON) {
+            const requestBody = this.bodyType === BODY_TYPE_PLAIN
+                ? request.rawBody.toString('utf-8')
+                : request.rawBody.toString('hex');
+
             if (this.body !== requestBody) {
                 throw new Mismatch(`Expected raw body ${this.body} does not match actual ${requestBody}`);
             }
